@@ -1,0 +1,164 @@
+//---------------------------------------------------------------------------
+
+#ifndef Unit1H
+#define Unit1H
+//---------------------------------------------------------------------------
+#include <System.Classes.hpp>
+#include <Vcl.Controls.hpp>
+#include <Vcl.StdCtrls.hpp>
+#include <Vcl.Forms.hpp>
+#include <Vcl.Dialogs.hpp>
+#include <Vcl.ExtCtrls.hpp>
+#include <Vcl.ExtDlgs.hpp>
+#include <Vcl.Menus.hpp>
+#include <Vcl.Graphics.hpp>
+#include <Vcl.ComCtrls.hpp>
+#include <Data.Bind.Components.hpp>
+#include <Data.Bind.EngExt.hpp>
+#include <System.Bindings.Outputs.hpp>
+#include <System.Rtti.hpp>
+#include <Vcl.Bind.DBEngExt.hpp>
+#include <Vcl.Imaging.pngimage.hpp>
+//---------------------------------------------------------------------------
+class TForm1 : public TForm
+{
+__published:	// IDE-managed Components
+	TMainMenu *MainMenu1;
+	TMenuItem *File1;
+	TMenuItem *Open1;
+	TMenuItem *miImage;
+	TImage *imPicture;
+	TOpenPictureDialog *OpenPictureDialog1;
+	TMenuItem *Image1;
+	TMenuItem *Adjustment1;
+	TMenuItem *Inverse1;
+	TMenuItem *RedChannel1;
+	TMenuItem *CyranChannel1;
+	TButton *Button1;
+	TColorDialog *ColorDialog1;
+	TMenuItem *PenColor1;
+	TRadioGroup *RadioGroup1;
+	TPageControl *PageControl1;
+	TTabSheet *TabSheet1;
+	TTabSheet *TabSheet2;
+	TImage *imRedHistogram;
+	TImage *imGreenHistogram;
+	TImage *imBlueHistogram;
+	TMenuItem *ChanelCount1;
+	TImage *imRedHistogram2;
+	TImage *imGreenHistogram2;
+	TImage *imBlueHistogram2;
+	TImage *imPicture2;
+	TButton *Button2;
+	TLabel *lblBefore;
+	TLabel *lblAfter;
+	TLabel *Label1;
+	TLabel *Label2;
+	TTabSheet *TabSheet3;
+	TImage *imPicture3;
+	TImage *imPicture4;
+	TImage *imLevel;
+	TLabel *lblAfter2;
+	TLabel *lblBefore2;
+	TEdit *edLevelInputMin;
+	TEdit *edLevelInputMax;
+	TEdit *edLevelOutputMax;
+	TEdit *edLevelOutputMin;
+	TPanel *Panel1;
+	TPageControl *PageControl2;
+	TTabSheet *TabSheet4;
+	TImage *Image2;
+	TTabSheet *TabSheet5;
+	TPanel *Panel2;
+	TImage *imPicture5;
+	TImage *imPicture6;
+	TLabel *lblAfter3;
+	TLabel *lblBefore3;
+	TButton *Button3;
+	TButton *Button4;
+	TButton *Button5;
+	TButton *Button6;
+	TButton *Button7;
+	TButton *Button8;
+	TTabSheet *TabSheet6;
+	TPanel *Panel3;
+	TImage *imRColorModel;
+	TImage *imGColorModel;
+	TImage *imBColorModel;
+	TTrackBar *tkbRColorModel;
+	TTrackBar *tkbGColorModel;
+	TTrackBar *tkbBColorModel;
+	TLabel *Label3;
+	TLabel *Label4;
+	TImage *imPicture7;
+	TImage *imPicture8;
+	TImage *imYUVColorModel;
+	TLabel *Label5;
+	TTrackBar *tkbYUVColorModel;
+	TLabel *Label6;
+	TLabel *Label7;
+	void __fastcall miImageClick(TObject *Sender);
+	void __fastcall Inverse1Click(TObject *Sender);
+	void __fastcall RedChannel1Click(TObject *Sender);
+	void __fastcall CyranChannel1Click(TObject *Sender);
+	void __fastcall Button1Click(TObject *Sender);
+	void __fastcall imPictureMouseDown(TObject *Sender, TMouseButton Button, TShiftState Shift,
+          int X, int Y);
+	void __fastcall PenColor1Click(TObject *Sender);
+	void __fastcall RadioGroup1Click(TObject *Sender);
+	void __fastcall Button2Click(TObject *Sender);
+	void __fastcall edLevelInputMinChange(TObject *Sender);
+	void __fastcall edLevelInputMinExit(TObject *Sender);
+	void __fastcall edLevelInputMaxChange(TObject *Sender);
+	void __fastcall edLevelInputMaxExit(TObject *Sender);
+	void __fastcall edLevelOutputMinChange(TObject *Sender);
+	void __fastcall edLevelOutputMinExit(TObject *Sender);
+	void __fastcall edLevelOutputMaxChange(TObject *Sender);
+	void __fastcall edLevelOutputMaxExit(TObject *Sender);
+	void __fastcall imLevelMouseDown(TObject *Sender, TMouseButton Button, TShiftState Shift,
+          int X, int Y);
+	void __fastcall Button3Click(TObject *Sender);
+	void __fastcall Button4Click(TObject *Sender);
+	void __fastcall Button7Click(TObject *Sender);
+	void __fastcall Button5Click(TObject *Sender);
+	void __fastcall Button6Click(TObject *Sender);
+	void __fastcall Button8Click(TObject *Sender);
+	void __fastcall tkbRColorModelChange(TObject *Sender);
+	void __fastcall tkbGColorModelChange(TObject *Sender);
+	void __fastcall tkbBColorModelChange(TObject *Sender);
+
+
+private:	// User declarations
+public:		// User declarations
+	__fastcall TForm1(TComponent* Owner);
+};
+//---------------------------------------------------------------------------
+extern PACKAGE TForm1 *Form1;
+//---------------------------------------------------------------------------
+int i,j,k,l,m;
+int iImageHeight,iImageWidth;
+Byte *bPtrImageRow;
+int iRedMax,iGreenMax,iBlueMax;
+//---------------------------------------------------------------------------
+int iRChanelCount[256] = {0}, iGChanelCount[256] = {0}, iBChanelCount[256] = {0};
+int iRChanelCount2[256] = {0}, iGChanelCount2[256] = {0}, iBChanelCount2[256] = {0};
+
+void FindMaximumOfRGB(TImage *imPicture);
+void DrawHistogram(TImage *imRedHistogram,TImage *imGreenHistogram,TImage *imBlueHistogram);
+void DrawHistogram2(TImage *imRedHistogram2,TImage *imGreenHistogram2,TImage *imBlueHistogram2);
+//---------------------------------------------------------------------------
+int iLevelInputMin, iLevelInputMax;
+int iLevelOutputMin, iLevelOutputMax;
+int iPositionX,iPositionY;
+int iNewPicture4Value[256];
+Byte *bPtrImageRowTemp;
+bool boLevelOrCurve;
+
+void DrawLevel(TImage *imLevel);
+void DrawPicture4(TImage *imPicture3,TImage *imPicture4);
+//---------------------------------------------------------------------------
+void GrayPalette(TImage *imPicture, TImage *imColorModel);
+void ColorModel(TImage *imRColorModel, TImage *imGColorModel, TImage *imBColorModel);
+//---------------------------------------------------------------------------
+
+#endif

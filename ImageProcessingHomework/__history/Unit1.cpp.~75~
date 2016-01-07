@@ -1,0 +1,1170 @@
+﻿//---------------------------------------------------------------------------
+
+#include <vcl.h>
+#pragma hdrstop
+
+#include "Unit1.h"
+#include <vector>
+#include <Algorithm>
+#include <iostream>
+using namespace std;
+//---------------------------------------------------------------------------
+#pragma package(smart_init)
+#pragma resource "*.dfm"
+TForm1 *Form1;
+
+//---------------------------------------------------------------------------
+__fastcall TForm1::TForm1(TComponent* Owner)
+	: TForm(Owner)
+{
+	//Initial Picture 8
+	GrayPalette(imPicture7,imPicture8);
+
+	//Initial YUV Color Model
+	YUVColorModel(imYUVColorModel);
+
+	//Initial Color Model
+	ColorModel(imRColorModel,imGColorModel,imBColorModel);
+
+	//Set Level Input & Output Max,Min
+	iLevelInputMin = StrToIntDef (edLevelInputMin->Text, 0);
+	iLevelInputMax = StrToIntDef (edLevelInputMax->Text, 255);
+
+	iLevelOutputMin = StrToIntDef (edLevelOutputMin->Text, 0);
+	iLevelOutputMax = StrToIntDef (edLevelOutputMax->Text, 255);
+
+	boLevelOrCurve = false;
+
+	//Set imLevel
+	imLevel->Canvas->Pen->Color = clBlack;
+	imLevel->Canvas->Brush->Color = clWhite;
+	imLevel->Canvas->Rectangle(0, 0, 200, 200);
+
+	imLevel->Canvas->Pen->Color = clRed;
+	imLevel->Canvas->MoveTo(0,200);
+	imLevel->Canvas->LineTo(200,0);
+
+	//Set imPicture4 Picture
+	imPicture4->Picture = imPicture3->Picture;
+
+	//Set Canvas Pen Color and Width
+	imRedHistogram->Canvas->Pen->Color = clRed;
+	imRedHistogram->Canvas->Pen->Width = 1;
+
+	imGreenHistogram->Canvas->Pen->Color = clGreen;
+	imGreenHistogram->Canvas->Pen->Width = 1;
+
+	imBlueHistogram->Canvas->Pen->Color = clBlue;
+	imBlueHistogram->Canvas->Pen->Width = 1;
+
+	imRedHistogram2->Canvas->Pen->Color = clRed;
+	imRedHistogram2->Canvas->Pen->Width = 1;
+
+	imGreenHistogram2->Canvas->Pen->Color = clGreen;
+	imGreenHistogram2->Canvas->Pen->Width = 1;
+
+	imBlueHistogram2->Canvas->Pen->Color = clBlue;
+	imBlueHistogram2->Canvas->Pen->Width = 1;
+
+	//Put Picture Height and Width in iImageHeight,iImageWidth
+	iImageHeight = imPicture->Picture->Height;
+	iImageWidth = imPicture->Picture->Width;
+
+	FindMaximumOfRGB(imPicture);
+
+	DrawHistogram(imRedHistogram, imGreenHistogram, imBlueHistogram);
+
+	DrawHistogram2(imRedHistogram2, imGreenHistogram2, imBlueHistogram2);
+
+//	ShowMessage(iBlueMax);
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::miImageClick(TObject *Sender)
+{
+	//Open Dialog and Find Picture
+	if (OpenPictureDialog1->Execute())
+		{
+		imPicture->Picture->LoadFromFile(OpenPictureDialog1->FileName);
+		iImageHeight = imPicture->Picture->Height;
+		iImageWidth = imPicture->Picture->Width;
+		}
+
+
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::Inverse1Click(TObject *Sender)
+{
+	//Inverse The Picture
+	for(j = 0; j < iImageHeight; j++)
+		{
+		bPtrImageRow = (Byte *)imPicture->Picture->Bitmap->ScanLine[j];
+		for(i = 0; i < iImageWidth; i++)
+			{
+			for(k = 0; k < 3; k++)
+				bPtrImageRow[3 * i + k] = 255 - bPtrImageRow[3 * i + k];
+			}
+		}
+	imPicture->Refresh();
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::RedChannel1Click(TObject *Sender)
+{
+	//Show only Red
+	for(j = 0; j < iImageHeight; j++)
+		{
+		bPtrImageRow = (Byte *)imPicture->Picture->Bitmap->ScanLine[j];
+		for(i = 0; i < iImageWidth; i++)
+			{
+			for(k = 0; k < 2; k++)
+				bPtrImageRow[3 * i + k] = 0;
+			}
+		}
+	imPicture->Refresh();
+
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::CyranChannel1Click(TObject *Sender)
+{
+	//Show only Cyran
+	for(j = 0; j < iImageHeight; j++)
+		{
+		bPtrImageRow = (Byte *)imPicture->Picture->Bitmap->ScanLine[j];
+		for(i = 0; i < iImageWidth; i++)
+			{
+			bPtrImageRow[3 * i + 2] = 0;
+			}
+		}
+	imPicture->Refresh();
+
+}
+//---------------------------------------------------------------------------
+
+
+void __fastcall TForm1::Button1Click(TObject *Sender)
+{
+	//Set Pen Color and Situation
+	imPicture->Canvas->Pen->Color = clRed;;
+	imPicture->Canvas->Pen->Width = 5;
+	imPicture->Canvas->MoveTo(100, 100);
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::imPictureMouseDown(TObject *Sender, TMouseButton Button, TShiftState Shift,
+		  int X, int Y)
+{
+	//Left button set situation else draw line
+	if (Button == mbLeft)
+		imPicture->Canvas->MoveTo(X, Y);
+	else
+		imPicture->Canvas->LineTo(X, Y);
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::PenColor1Click(TObject *Sender)
+{
+	if (ColorDialog1->Execute())
+		imPicture->Canvas->Pen->Color = ColorDialog1->Color;
+}
+//---------------------------------------------------------------------------
+
+
+void __fastcall TForm1::RadioGroup1Click(TObject *Sender)
+{
+	imPicture->Canvas->Pen->Width = RadioGroup1->ItemIndex + 1;
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::Button2Click(TObject *Sender)
+{
+	//把Chanel Count都清空
+	for (i = 0; i < 256; i++)
+		{
+		iRChanelCount[i] = 0;
+		iGChanelCount[i] = 0;
+		iBChanelCount[i] = 0;
+		}
+
+	//對圖作均化
+	imPicture2->Picture = imPicture->Picture;
+	for (j = 0; j < iImageHeight; j++)
+		{
+		bPtrImageRow = (Byte *)imPicture2->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < iImageWidth; i++)
+			{
+			bPtrImageRow[3*i] = 255 * iBChanelCount2[bPtrImageRow[3*i]]/iBChanelCount2[255];
+			bPtrImageRow[3*i +1] = 255 * iGChanelCount2[bPtrImageRow[3*i +1]]/iGChanelCount2[255];
+			bPtrImageRow[3*i +2] = 255 * iRChanelCount2[bPtrImageRow[3*i +2]]/iRChanelCount2[255];
+			}
+		}
+	FindMaximumOfRGB(imPicture2);
+
+	//把Chanel Count都清空
+	for (i = 0; i < 256; i++)
+		{
+		iRChanelCount2[i] = 0;
+		iGChanelCount2[i] = 0;
+		iBChanelCount2[i] = 0;
+		}
+
+	//把 Histogram 的圖也都清空
+	imRedHistogram->Canvas->Brush->Color = clWhite;
+	imRedHistogram->Canvas->Rectangle(TRect(-1, -1, 300, 300));
+
+	imGreenHistogram->Canvas->Brush->Color = clWhite;
+	imGreenHistogram->Canvas->Rectangle(TRect(-1, -1, 300, 300));
+
+	imBlueHistogram->Canvas->Brush->Color = clWhite;
+	imBlueHistogram->Canvas->Rectangle(TRect(-1, -1, 300, 300));
+
+	DrawHistogram(imRedHistogram, imGreenHistogram, imBlueHistogram);
+
+	DrawHistogram2(imRedHistogram2, imGreenHistogram2, imBlueHistogram2);
+	lblBefore->Visible = true;
+	lblAfter->Visible = true;
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::edLevelInputMinChange(TObject *Sender)
+{
+	//取得InputMin的値大於255就設成255
+	iLevelInputMin = StrToIntDef(edLevelInputMin->Text,0);
+
+	if (iLevelInputMin > 255)
+		{
+		iLevelInputMin = 255;
+		edLevelInputMin->Text = 255;
+		}
+	DrawLevel(imLevel);
+
+	DrawPicture4(imPicture3, imPicture4);
+}
+//---------------------------------------------------------------------------
+void FindMaximumOfRGB(TImage *imPicture)
+{
+	//Count R(0~255)num G(0~255)num B(0~255)num and Find MaxNum Of R G B
+	for (j = 0; j < iImageHeight; j++)
+		{
+		bPtrImageRow = (Byte *)imPicture->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < iImageWidth; i++)
+			{
+			iBChanelCount[bPtrImageRow[i*3]]++;
+			if (iBlueMax < iBChanelCount[bPtrImageRow[i*3]])
+				iBlueMax = iBChanelCount[bPtrImageRow[i*3]];
+
+			iGChanelCount[bPtrImageRow[i*3 + 1]]++;
+			if (iGreenMax < iGChanelCount[bPtrImageRow[i*3 +1]])
+				iGreenMax = iGChanelCount[bPtrImageRow[i*3 +1]];
+
+			iRChanelCount[bPtrImageRow[i*3 + 2]]++;
+			if (iRedMax < iRChanelCount[bPtrImageRow[i*3 +2]])
+				iRedMax = iRChanelCount[bPtrImageRow[i*3 +2]];
+			}
+		}
+}
+//---------------------------------------------------------------------------
+void DrawHistogram(TImage *imRedHistogram,TImage *imGreenHistogram,TImage *imBlueHistogram)
+{
+	//取第二大值
+	int iB = 0, iG = 0, iR = 0;
+	for (i = 0; i < 256; i++)
+		{
+		if (iBlueMax != iBChanelCount[i] && iB < iBChanelCount[i])
+			iB = iBChanelCount[i];
+
+		if (iGreenMax != iGChanelCount[i] && iG < iGChanelCount[i])
+			iG = iGChanelCount[i];
+
+		if (iRedMax != iRChanelCount[i] && iR < iRChanelCount[i])
+			iR = iRChanelCount[i];
+		}
+
+	//Count the Scale Ratio
+	float fRedRatio = 200 / float(iR);
+	float fGreenRatio = 200 / float(iG);
+	float fBlueRatio = 200 / float(iB);
+
+	//Draw Histogram
+	for (i = 0; i < 256; i++)
+		{
+		imRedHistogram->Canvas->MoveTo(i, 200);
+		imRedHistogram->Canvas->LineTo(i, 200 - iRChanelCount[i]*fRedRatio);
+
+		imGreenHistogram->Canvas->MoveTo(i, 200);
+		imGreenHistogram->Canvas->LineTo(i, 200 - iGChanelCount[i]*fGreenRatio);
+
+		imBlueHistogram->Canvas->MoveTo(i, 200);
+		imBlueHistogram->Canvas->LineTo(i, 200 - iBChanelCount[i]*fBlueRatio);
+
+		if (i != 0)
+			{
+			iRChanelCount2[i] = iRChanelCount2[i-1] + iRChanelCount[i];
+			iGChanelCount2[i] = iGChanelCount2[i-1] + iGChanelCount[i];
+			iBChanelCount2[i] = iBChanelCount2[i-1] + iBChanelCount[i];
+			}
+		else
+			{
+			iRChanelCount2[i] = iRChanelCount[i];
+			iGChanelCount2[i] = iGChanelCount[i];
+			iBChanelCount2[i] = iBChanelCount[i];
+			}
+
+		}
+
+}
+//---------------------------------------------------------------------------
+void DrawHistogram2(TImage *imRedHistogram2,TImage *imGreenHistogram2,TImage *imBlueHistogram2)
+{
+	//Count 累積直方圖 Scale Ratio
+	float fRedRatio = 200 / float(iRChanelCount2[255]);
+	float fGreenRatio = 200 / float(iGChanelCount2[255]);
+	float fBlueRatio = 200 / float(iBChanelCount2[255]);
+
+	//Draw 累積直方圖
+	for (i = 0; i < 256; i++)
+		{
+		imRedHistogram2->Canvas->MoveTo(i, 200);
+		imRedHistogram2->Canvas->LineTo(i, 200 - iRChanelCount2[i]*fRedRatio);
+
+		imGreenHistogram2->Canvas->MoveTo(i, 200);
+		imGreenHistogram2->Canvas->LineTo(i, 200 - iGChanelCount2[i]*fGreenRatio);
+
+		imBlueHistogram2->Canvas->MoveTo(i, 200);
+		imBlueHistogram2->Canvas->LineTo(i, 200 - iBChanelCount2[i]*fBlueRatio);
+		}
+
+}
+//---------------------------------------------------------------------------
+void DrawLevel(TImage *imLevel)
+{
+	//Count Ratio
+	float fLevelRatioX = float(imLevel->Width) / 256;
+	float fLevelRatioY = float(imLevel->Height) / 256;
+
+
+	//Draw Diagram
+	imLevel->Canvas->Pen->Color = clBlack;
+	imLevel->Canvas->Brush->Color = clWhite;
+	imLevel->Canvas->Rectangle(0, 0, imLevel->Width, imLevel->Height);
+
+	imLevel->Canvas->Pen->Color = clRed;
+
+	if (!boLevelOrCurve)
+		{
+		//Create Table for imPicture4
+		for (i = 0; i < 256; i++)
+			{
+			if (i <= iLevelInputMin)
+				iNewPicture4Value[i] = iLevelOutputMin;
+
+			else if (i >= iLevelInputMax)
+				iNewPicture4Value[i] = iLevelOutputMax;
+			else
+				iNewPicture4Value[i] = iLevelOutputMin + (i - iLevelInputMin) *
+					(iLevelOutputMax - iLevelOutputMin) / (iLevelInputMax - iLevelInputMin);
+			}
+		imLevel->Canvas->MoveTo(0, imLevel->Height - 1 - iLevelOutputMin * fLevelRatioY);
+
+		imLevel->Canvas->LineTo(iLevelInputMin * fLevelRatioX + 0.5,
+							imLevel->Height - 1 - iLevelOutputMin * fLevelRatioY);
+
+		imLevel->Canvas->LineTo(iLevelInputMax * fLevelRatioX + 0.5,
+							imLevel->Height - 1 - iLevelOutputMax * fLevelRatioY);
+
+		imLevel->Canvas->LineTo(imLevel->Width, imLevel->Height - 1 -
+							iLevelOutputMax * fLevelRatioY);
+
+		}
+	else
+		{
+		imLevel->Canvas->Brush->Color = clRed;
+		//draw Point
+		imLevel->Canvas->Ellipse(iPositionX - sqrt(2*2*2), iPositionY - sqrt(2*2*2),
+									iPositionX + sqrt(2*2*2) +1, iPositionY + sqrt(2*2*2) +1);
+		//draw Curve
+		float fA,fB,fC,fD,fPositionX,fPositionY;
+
+		fPositionX = float(iPositionX) / fLevelRatioX;
+		fPositionY = 255 - float(iPositionY) / fLevelRatioY;
+
+		fD = float(pow(iLevelInputMin,2)*iLevelInputMax + pow(iLevelInputMax,2)* fPositionX +
+			pow(fPositionX,2) * iLevelInputMin - pow(fPositionX,2) * iLevelInputMax -pow(iLevelInputMax,2) * iLevelInputMin -
+			pow(iLevelInputMin,2) * fPositionX);
+		fA = float(iLevelOutputMin * iLevelInputMax + iLevelInputMin * fPositionY +
+			iLevelOutputMax * fPositionX - iLevelInputMax * fPositionY - iLevelInputMin * iLevelOutputMax -
+			iLevelOutputMin * fPositionX);
+		fB = float(pow(iLevelInputMin,2) * iLevelOutputMax + pow(iLevelInputMax,2) * fPositionY + pow(iPositionX,2) * iLevelOutputMin -
+			pow(fPositionX,2) * iLevelOutputMax - pow(iLevelInputMin,2) * fPositionY - pow(iLevelInputMax,2) * iLevelOutputMin);
+		fC = float(pow(iLevelInputMin,2) * iLevelInputMax * fPositionY + pow(iLevelInputMax,2) * iLevelOutputMin * fPositionX +
+			pow(fPositionX,2) * iLevelInputMin * iLevelOutputMax - pow(fPositionX,2) * iLevelInputMax * iLevelOutputMin -
+			pow(iLevelInputMax,2) * iLevelInputMin * fPositionY - pow(iLevelInputMin,2) * iLevelOutputMax * fPositionX);
+
+		int iTemp;
+		for (i = 0; i< 256; i++)
+			{
+			iTemp = fA * pow(i,2)/fD + fB * i/fD + fC/fD;
+
+			if (i >= iLevelInputMax)
+				iTemp = iLevelOutputMax;
+			else if (i <= iLevelInputMin)
+				iTemp = iLevelOutputMin;
+			else
+				{
+				if (iTemp > 255)
+					iTemp = 255;
+				else if (iTemp < 0)
+					iTemp = 0;
+				}
+
+			iNewPicture4Value[i] = iTemp;
+			}
+
+		imLevel->Canvas->MoveTo(0, imLevel->Height - 1 - iLevelOutputMin * fLevelRatioY);
+
+		for (i = iLevelInputMin; i <= iLevelInputMax; i++)
+			{
+			iTemp = i * fLevelRatioX + 0.5;
+			imLevel->Canvas->LineTo(iTemp, imLevel->Height - 1 - iNewPicture4Value[i] * fLevelRatioY);
+			}
+
+		if (iLevelInputMax < 255)
+			{
+			imLevel->Canvas->LineTo(imLevel->Width, imLevel->Height - 1 -
+										iLevelOutputMax * fLevelRatioY);
+			}
+		}
+
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::edLevelInputMinExit(TObject *Sender)
+{
+	if (iLevelInputMin == 0)
+		edLevelInputMin->Text = 0;
+}
+//---------------------------------------------------------------------------
+void DrawPicture4(TImage *imPicture3,TImage *imPicture4)
+{
+	//Draw imPicture4
+	for (j = 0; j < imPicture4->Picture->Height; j++)
+		{
+		bPtrImageRowTemp = (Byte *)imPicture3->Picture->Bitmap->ScanLine[j];
+		bPtrImageRow = (Byte *)imPicture4->Picture->Bitmap->ScanLine[j];
+
+		for (i = 0; i < imPicture4->Picture->Width; i++)
+			{
+			bPtrImageRow[3*i] = iNewPicture4Value[bPtrImageRowTemp[3*i]];
+			bPtrImageRow[3*i +1] = iNewPicture4Value[bPtrImageRowTemp[3*i +1]];
+			bPtrImageRow[3*i +2] = iNewPicture4Value[bPtrImageRowTemp[3*i +2]];
+			}
+		}
+	imPicture4->Refresh();
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::edLevelInputMaxChange(TObject *Sender)
+{
+	//取得InputMax的値大於255就設成255
+	iLevelInputMax = StrToIntDef(edLevelInputMax->Text,255);
+
+	if (iLevelInputMax > 255)
+		{
+		iLevelInputMax = 255;
+		edLevelInputMax->Text = 255;
+		}
+	DrawLevel(imLevel);
+
+	DrawPicture4(imPicture3, imPicture4);
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::edLevelInputMaxExit(TObject *Sender)
+{
+	if (iLevelInputMax == 255)
+		edLevelInputMax->Text = 255;
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::edLevelOutputMinChange(TObject *Sender)
+{
+	//取得OutputMin的値大於255就設成255
+	iLevelOutputMin = StrToIntDef(edLevelOutputMin->Text,0);
+
+	if (iLevelOutputMin > 255)
+		{
+		iLevelOutputMin = 255;
+		edLevelOutputMin->Text = 255;
+		}
+	DrawLevel(imLevel);
+
+	DrawPicture4(imPicture3, imPicture4);
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::edLevelOutputMinExit(TObject *Sender)
+{
+	if (iLevelOutputMin == 0)
+		edLevelOutputMin->Text = 0;
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::edLevelOutputMaxChange(TObject *Sender)
+{
+	//取得OutputMax的値大於255就設成255
+	iLevelOutputMax = StrToIntDef(edLevelOutputMax->Text,255);
+
+	if (iLevelOutputMax > 255)
+		{
+		iLevelOutputMax = 255;
+		edLevelOutputMax->Text = 255;
+		}
+	DrawLevel(imLevel);
+
+	DrawPicture4(imPicture3, imPicture4);
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::edLevelOutputMaxExit(TObject *Sender)
+{
+	if (iLevelOutputMax == 255)
+		edLevelOutputMax->Text = 255;
+}
+//---------------------------------------------------------------------------
+
+
+
+void __fastcall TForm1::imLevelMouseDown(TObject *Sender, TMouseButton Button, TShiftState Shift,
+		  int X, int Y)
+{
+	if (Button == mbLeft)
+		{
+		iPositionX = X;
+		iPositionY = Y;
+
+		boLevelOrCurve = true;
+		}
+	else
+		boLevelOrCurve = false;
+
+	DrawLevel(imLevel);
+
+	DrawPicture4(imPicture3, imPicture4);
+}
+//---------------------------------------------------------------------------
+
+
+void __fastcall TForm1::Button3Click(TObject *Sender)
+{
+	//Smooth Filter
+	imPicture6->Picture = imPicture5->Picture;
+
+	int iNewR,iNewG,iNewB;
+	int iDivide;
+	int iRange = 3;
+
+	for (j = 0; j < imPicture6->Picture->Height; j++)
+		{
+		bPtrImageRow = (Byte *)imPicture6->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < imPicture6->Picture->Width; i++)
+			{
+			iDivide = 0;
+			iNewR = iNewG = iNewB = 0;
+
+			for (l = -iRange; l <= iRange; l++)
+				{
+				if (j+l < 0 || j+l >= imPicture6->Picture->Height)
+					continue;
+
+				bPtrImageRowTemp = (Byte *)imPicture5->Picture->Bitmap->ScanLine[j+l];
+				for (m = -iRange; m <= iRange; m++)
+					{
+					if (i+m < 0 || i+m >= imPicture6->Picture->Height)
+						continue;
+
+					iNewB = iNewB + bPtrImageRowTemp[3*(i+m)];
+					iNewG = iNewG + bPtrImageRowTemp[3*(i+m) +1];
+					iNewR = iNewR + bPtrImageRowTemp[3*(i+m) +2];
+					iDivide++;
+					}
+				}
+			bPtrImageRow[3*i] = iNewB / iDivide;
+			bPtrImageRow[3*i +1] = iNewG / iDivide;
+			bPtrImageRow[3*i +2] = iNewR / iDivide;
+			}
+		}
+
+	imPicture6->Refresh();
+
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::Button8Click(TObject *Sender)
+{
+	//Smooth Filter (Consider Corner)
+	imPicture6->Picture = imPicture5->Picture;
+
+	int iNewR,iNewG,iNewB;
+	int iDivide;
+	int iRange = 1;
+
+	for (j = 0; j < imPicture6->Picture->Height; j++)
+		{
+		bPtrImageRow = (Byte *)imPicture6->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < imPicture6->Picture->Width; i++)
+			{
+			iDivide = 0;
+			iNewR = iNewG = iNewB = 0;
+
+			for (l = -iRange; l <= iRange; l++)
+				{
+				if (j+l < 0 || j+l >= imPicture6->Picture->Height)
+					continue;
+
+				bPtrImageRowTemp = (Byte *)imPicture5->Picture->Bitmap->ScanLine[j+l];
+				for (m = -iRange; m <= iRange; m++)
+					{
+					if (i+m < 0 || i+m >= imPicture6->Picture->Height)
+						continue;
+
+					if (l == 0 && m ==0)
+						{
+						iNewB = iNewB + 4 * bPtrImageRowTemp[3*(i+m)];
+						iNewG = iNewG + 4 * bPtrImageRowTemp[3*(i+m) +1];
+						iNewR = iNewR + 4 * bPtrImageRowTemp[3*(i+m) +2];
+						iDivide+=4;
+						}
+					else if (l*m == 0)
+						{
+						iNewB = iNewB + 2 * bPtrImageRowTemp[3*(i+m)];
+						iNewG = iNewG + 2 * bPtrImageRowTemp[3*(i+m) +1];
+						iNewR = iNewR + 2 * bPtrImageRowTemp[3*(i+m) +2];
+						iDivide+=2;
+						}
+					else
+						{
+						iNewB = iNewB + bPtrImageRowTemp[3*(i+m)];
+						iNewG = iNewG + bPtrImageRowTemp[3*(i+m) +1];
+						iNewR = iNewR + bPtrImageRowTemp[3*(i+m) +2];
+						iDivide++;
+						}
+					}
+				}
+			bPtrImageRow[3*i] = iNewB / iDivide;
+			bPtrImageRow[3*i +1] = iNewG / iDivide;
+			bPtrImageRow[3*i +2] = iNewR / iDivide;
+			}
+		}
+
+	imPicture6->Refresh();
+
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::Button4Click(TObject *Sender)
+{
+	//Mean Filter
+	imPicture6->Picture = imPicture5->Picture;
+
+	//Mask vector
+	vector<int> vecMaskR,vecMaskG,vecMaskB;
+
+	int iRange = 1;
+
+	for (j = 0; j < imPicture6->Picture->Height; j++)
+		{
+		bPtrImageRow = (Byte *)imPicture6->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < imPicture6->Picture->Width; i++)
+			{
+			vecMaskB.clear();
+			vecMaskG.clear();
+			vecMaskR.clear();
+
+			for (l = -iRange; l <= iRange; l++)
+				{
+				if (j+l < 0 || j+l >= imPicture6->Picture->Height)
+					continue;
+				bPtrImageRowTemp = (Byte *)imPicture5->Picture->Bitmap->ScanLine[j+l];
+				for (m = -iRange; m <= iRange; m++)
+					{
+					if (i+m < 0 || i+m >= imPicture6->Picture->Height)
+						continue;
+					vecMaskB.push_back(bPtrImageRowTemp[3*(i+m)]);
+					vecMaskG.push_back(bPtrImageRowTemp[3*(i+m) +1]);
+					vecMaskR.push_back(bPtrImageRowTemp[3*(i+m) +2]);
+					}
+				}
+			sort(vecMaskB.begin(),vecMaskB.end());
+			sort(vecMaskG.begin(),vecMaskG.end());
+			sort(vecMaskR.begin(),vecMaskR.end());
+
+			bPtrImageRow[3*i] = vecMaskB[vecMaskB.size()/2];
+			bPtrImageRow[3*i +1] = vecMaskG[vecMaskG.size()/2];
+			bPtrImageRow[3*i +2] = vecMaskR[vecMaskR.size()/2];
+			}
+		}
+
+	imPicture6->Refresh();
+
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::Button7Click(TObject *Sender)
+{
+	//Add Noise
+	srand(100);
+
+	for (j = 0; j < imPicture5->Picture->Height; j++)
+		{
+		bPtrImageRow = (Byte *)imPicture5->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < imPicture5->Picture->Width; i++)
+			{
+			if (rand()%100 <= 5)
+				{
+				bPtrImageRow[3*i] = 255;
+				bPtrImageRow[3*i +1] = 255;
+				bPtrImageRow[3*i +2] = 255;
+				}
+			}
+		}
+	imPicture5->Refresh();
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::Button5Click(TObject *Sender)
+{
+	//Sharp Filter (Normal)
+	imPicture6->Picture = imPicture5->Picture;
+
+	const int iRange = 1;
+	int iCount;
+	int iTempR[iRange*2+1][iRange*2+1] = {0},
+		iTempG[iRange*2+1][iRange*2+1] = {0},
+		iTempB[iRange*2+1][iRange*2+1] = {0};
+
+	int iSharpR,iSharpG,iSharpB;
+
+	for (j = 0; j < imPicture6->Picture->Height; j++)
+		{
+		bPtrImageRow = (Byte *)imPicture6->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < imPicture6->Picture->Width; i++)
+			{
+			iCount = 0;
+
+			for (l = -iRange; l <= iRange; l++)
+				{
+				if (j+l < 0 || j+l >= imPicture5->Picture->Height)
+					continue;
+				bPtrImageRowTemp = (Byte *)imPicture5->Picture->Bitmap->ScanLine[j+l];
+				for (m = -iRange; m <= iRange; m++)
+					{
+					if (i+m < 0 || i+m >= imPicture5->Picture->Height)
+						continue;
+					if (l * m == 0)
+						{
+						iCount++;
+						iTempB[l+1][m+1] = bPtrImageRowTemp[3*(i+m)];
+						iTempG[l+1][m+1] = bPtrImageRowTemp[3*(i+m) +1];
+						iTempR[l+1][m+1] = bPtrImageRowTemp[3*(i+m) +2];
+						}
+					}
+				}
+			iSharpR = iSharpG = iSharpB = 0;
+			for (l = -iRange; l <= iRange; l++)
+				{
+				if (j+l < 0 || j+l >= imPicture5->Picture->Height)
+					continue;
+				for (m = -iRange; m <= iRange; m++)
+					{
+					if (i+m < 0 || i+m >= imPicture5->Picture->Height)
+						continue;
+					if (l == 0 && m==0)
+						{
+						iSharpB = iSharpB + iCount *iTempB[l+1][m+1];
+						iSharpG = iSharpG + iCount *iTempG[l+1][m+1];
+						iSharpR = iSharpR + iCount *iTempR[l+1][m+1];
+						}
+					else
+						{
+						iSharpB = iSharpB - iTempB[l+1][m+1];
+						iSharpG = iSharpG - iTempG[l+1][m+1];
+						iSharpR = iSharpR - iTempR[l+1][m+1];
+						}
+					iTempB[l+1][m+1] = 0;
+					iTempG[l+1][m+1] = 0;
+					iTempR[l+1][m+1] = 0;
+					}
+				}
+			if (iSharpB > 255)
+				iSharpB = 255;
+			else if (iSharpB < 0)
+				iSharpB = 0;
+
+			if (iSharpG > 255)
+				iSharpG = 255;
+			else if (iSharpG < 0)
+				iSharpG = 0;
+
+			if (iSharpR > 255)
+				iSharpR = 255;
+			else if (iSharpR < 0)
+				iSharpR = 0;
+
+
+			bPtrImageRow[3*i] = iSharpB;
+			bPtrImageRow[3*i +1] = iSharpG;
+			bPtrImageRow[3*i +2] = iSharpR;
+			}
+		}
+
+	imPicture6->Refresh();
+
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::Button6Click(TObject *Sender)
+{
+	//Sharp Filter (Consider Corner)
+	imPicture6->Picture = imPicture5->Picture;
+
+	const int iRange = 1;
+	int iCount;
+	int iTempR[iRange*2+1][iRange*2+1] = {0},
+		iTempG[iRange*2+1][iRange*2+1] = {0},
+		iTempB[iRange*2+1][iRange*2+1] = {0};
+
+	int iSharpR,iSharpG,iSharpB;
+
+	for (j = 0; j < imPicture6->Picture->Height; j++)
+		{
+		bPtrImageRow = (Byte *)imPicture6->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < imPicture6->Picture->Width; i++)
+			{
+			iCount = 0;
+
+			for (l = -iRange; l <= iRange; l++)
+				{
+				if (j+l < 0 || j+l >= imPicture5->Picture->Height)
+					continue;
+				bPtrImageRowTemp = (Byte *)imPicture5->Picture->Bitmap->ScanLine[j+l];
+				for (m = -iRange; m <= iRange; m++)
+					{
+					if (i+m < 0 || i+m >= imPicture5->Picture->Height)
+						continue;
+						iCount++;
+						iTempB[l+1][m+1] = bPtrImageRowTemp[3*(i+m)];
+						iTempG[l+1][m+1] = bPtrImageRowTemp[3*(i+m) +1];
+						iTempR[l+1][m+1] = bPtrImageRowTemp[3*(i+m) +2];
+					}
+				}
+			iSharpR = iSharpG = iSharpB = 0;
+			for (l = -iRange; l <= iRange; l++)
+				{
+				if (j+l < 0 || j+l >= imPicture5->Picture->Height)
+					continue;
+				for (m = -iRange; m <= iRange; m++)
+					{
+					if (i+m < 0 || i+m >= imPicture5->Picture->Height)
+						continue;
+					if (l == 0 && m==0)
+						{
+						iSharpB = iSharpB + iCount *iTempB[l+1][m+1];
+						iSharpG = iSharpG + iCount *iTempG[l+1][m+1];
+						iSharpR = iSharpR + iCount *iTempR[l+1][m+1];
+						}
+					else
+						{
+						iSharpB = iSharpB - iTempB[l+1][m+1];
+						iSharpG = iSharpG - iTempG[l+1][m+1];
+						iSharpR = iSharpR - iTempR[l+1][m+1];
+						}
+					iTempB[l+1][m+1] = 0;
+					iTempG[l+1][m+1] = 0;
+					iTempR[l+1][m+1] = 0;
+					}
+				}
+			if (iSharpB > 255)
+				iSharpB = 255;
+			else if (iSharpB < 0)
+				iSharpB = 0;
+
+			if (iSharpG > 255)
+				iSharpG = 255;
+			else if (iSharpG < 0)
+				iSharpG = 0;
+
+			if (iSharpR > 255)
+				iSharpR = 255;
+			else if (iSharpR < 0)
+				iSharpR = 0;
+
+
+			bPtrImageRow[3*i] = iSharpB;
+			bPtrImageRow[3*i +1] = iSharpG;
+			bPtrImageRow[3*i +2] = iSharpR;
+			}
+		}
+	imPicture6->Refresh();
+}
+//---------------------------------------------------------------------------
+void GrayPalette(TImage *imPicture, TImage *imColorModel)
+{
+	//Set Canvas
+	imColorModel->Width = imPicture->Width;
+	imColorModel->Height = imPicture->Height;
+	imColorModel->Picture->Bitmap->Width = imPicture->Picture->Bitmap->Width;
+	imColorModel->Picture->Bitmap->Height = imPicture->Picture->Bitmap->Height;
+	imColorModel->Picture->Bitmap->PixelFormat = pf8bit;
+
+	//Gray Palette
+	LOGPALETTE GrayPalette;
+	PALETTEENTRY PaletteEntry;
+	GrayPalette.palVersion = 0x300;
+	GrayPalette.palNumEntries = 256;
+	HPALETTE GrayPaletteHandle = CreatePalette(&GrayPalette);
+	for (i = 0; i < 256; i++)
+		{
+		PaletteEntry.peRed = i;
+		PaletteEntry.peGreen = i;
+		PaletteEntry.peBlue = i;
+		SetPaletteEntries(GrayPaletteHandle,i,1,&PaletteEntry);
+		}
+	imColorModel->Picture->Bitmap->Palette = GrayPaletteHandle;
+
+	for (j = 0; j < imPicture->Picture->Height; j++)
+		{
+		bPtrImageRow = (Byte *)imColorModel->Picture->Bitmap->ScanLine[j];
+		bPtrImageRowTemp = (Byte *)imPicture->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < imPicture->Picture->Width; i++)
+			bPtrImageRow[i] = (unsigned char)((0.299 * bPtrImageRowTemp[3*i] +
+												0.587 * bPtrImageRowTemp[3*i+1] +
+												0.114 * bPtrImageRowTemp[3*i+2])+ 0.5);
+		}
+	imColorModel->Refresh();
+
+}
+//---------------------------------------------------------------------------
+void ColorModel(TImage *imRColorModel, TImage *imGColorModel, TImage *imBColorModel)
+{
+	int iHeight = 200;
+	int iWidth = 200;
+	//Set RColorMode
+	imRColorModel->Width = iWidth;
+	imRColorModel->Height = iHeight;
+	imRColorModel->Picture->Bitmap->Width = iWidth;
+	imRColorModel->Picture->Bitmap->Height = iHeight;
+	imRColorModel->Picture->Bitmap->PixelFormat = pf24bit;
+
+	//Set GColorMode
+	imGColorModel->Width = iWidth;
+	imGColorModel->Height = iHeight;
+	imGColorModel->Picture->Bitmap->Width = iWidth;
+	imGColorModel->Picture->Bitmap->Height = iHeight;
+	imGColorModel->Picture->Bitmap->PixelFormat = pf24bit;
+
+	//Set BColorMode
+	imBColorModel->Width = iWidth;
+	imBColorModel->Height = iHeight;
+	imBColorModel->Picture->Bitmap->Width = iWidth;
+	imBColorModel->Picture->Bitmap->Height = iHeight;
+	imBColorModel->Picture->Bitmap->PixelFormat = pf24bit;
+
+	//Initial Color Model
+	for (j = 0; j < iHeight; j++)
+		{
+		//R = 0
+		bPtrImageRow = (Byte *)imRColorModel->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < iWidth; i++)
+			{
+			bPtrImageRow[3*i] = i*255 / iWidth;
+			bPtrImageRow[3*i +1] = j*255 / iHeight;
+			bPtrImageRow[3*i +2] = 0;
+			}
+		}
+	for (j = 0; j < iHeight; j++)
+		{
+		//G = 0
+		bPtrImageRow = (Byte *)imGColorModel->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < iWidth; i++)
+			{
+			bPtrImageRow[3*i] = i*255 / iWidth;
+			bPtrImageRow[3*i +1] = 0;
+			bPtrImageRow[3*i +2] = j*255 / iHeight;
+			}
+		}
+	for (j = 0; j < iHeight; j++)
+		{
+		//B = 0
+		bPtrImageRow = (Byte *)imBColorModel->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < iWidth; i++)
+			{
+			bPtrImageRow[3*i] = 0;
+			bPtrImageRow[3*i +1] = i*255 / iWidth;
+			bPtrImageRow[3*i +2] = j*255 / iHeight;
+			}
+		}
+	imRColorModel->Refresh();
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::tkbRColorModelChange(TObject *Sender)
+{
+	int iPosition = tkbRColorModel->Position;
+	int iWidth = imRColorModel->Width;
+	int iHeight = imRColorModel->Height;
+
+	for (j = 0; j < iHeight; j++)
+		{
+		bPtrImageRow = (Byte *)imRColorModel->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < iWidth; i++)
+			bPtrImageRow[3*i +2] = iPosition;
+		}
+	imRColorModel->Refresh();
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::tkbGColorModelChange(TObject *Sender)
+{
+	int iPosition = tkbGColorModel->Position;
+	int iWidth = imGColorModel->Width;
+	int iHeight = imGColorModel->Height;
+
+	for (j = 0; j < iHeight; j++)
+		{
+		bPtrImageRow = (Byte *)imGColorModel->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < iWidth; i++)
+			bPtrImageRow[3*i +1] = iPosition;
+		}
+	imGColorModel->Refresh();
+
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::tkbBColorModelChange(TObject *Sender)
+{
+	int iPosition = tkbBColorModel->Position;
+	int iWidth = imBColorModel->Width;
+	int iHeight = imBColorModel->Height;
+
+	for (j = 0; j < iHeight; j++)
+		{
+		bPtrImageRow = (Byte *)imBColorModel->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < iWidth; i++)
+			bPtrImageRow[3*i] = iPosition;
+		}
+	imBColorModel->Refresh();
+
+}
+//---------------------------------------------------------------------------
+void YUVColorModel(TImage* imYUVColorModel)
+{
+	int iHeight = 200;
+	int iWidth = 200;
+
+	//Set YUVColorMode
+	imYUVColorModel->Width = iWidth;
+	imYUVColorModel->Height = iHeight;
+	imYUVColorModel->Picture->Bitmap->Width = iWidth;
+	imYUVColorModel->Picture->Bitmap->Height = iHeight;
+	imYUVColorModel->Picture->Bitmap->PixelFormat = pf24bit;
+
+	float iU = 0, iV = 0;
+	int iC = -16, iD = 0, iE = 0;
+	int iR = 0, iG = 0, iB = 0;
+
+	for (j = 0; j < iHeight; j++)
+		{
+		bPtrImageRow = (Byte *)imYUVColorModel->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < iWidth; i++)
+			{
+			iU = j*255 / iHeight;
+			iV = i*255 / iWidth;
+
+			iD = iU -128;
+			iE = iV -128;
+
+			iR = (298*iC + 409*iE +128)>>8;
+			iG = (298*iC - 100*iD - 208*iE +128)>>8;
+			iB = (298*iC + 516*iD +128)>>8;
+
+			if (iR > 255)
+				iR = 255;
+			if (iR < 0)
+				iR = 0;
+
+			if (iG > 255)
+				iG = 255;
+			if (iG < 0)
+				iG = 0;
+
+			if (iB > 255)
+				iB = 255;
+			if (iB < 0)
+				iB = 0;
+
+			bPtrImageRow[3*i] = iB;
+			bPtrImageRow[3*i +1] = iG;
+			bPtrImageRow[3*i +2] = iR;
+			}
+		}
+	imYUVColorModel->Refresh();
+}
+
+void __fastcall TForm1::imYUVColorModelMouseDown(TObject *Sender, TMouseButton Button,
+		  TShiftState Shift, int X, int Y)
+{
+	bPtrImageRow = (Byte *)imYUVColorModel->Picture->Bitmap->ScanLine[Y];
+	int iR = bPtrImageRow[3*X +2];
+	int iG = bPtrImageRow[3*X +1];
+	int iB = bPtrImageRow[3*X];
+
+	imPicture8->Picture->Bitmap->PixelFormat = pf24bit;
+	int iWidth = imPicture8->Picture->Width;
+	int iHeight = imPicture8->Picture->Height;
+
+	int iY = 0;
+	int iU = ((-38*iR -74*iG +112*iB +128)>>8)+128;
+	int iV = ((112*iR -94*iG -18*iB +128)>>8)+128;
+
+	int iC = 0;
+	int iD = 0;
+	int iE = 0;
+
+	for (j = 0; j < iHeight; j++)
+		{
+		bPtrImageRow = (Byte *)imPicture8->Picture->Bitmap->ScanLine[j];
+		bPtrImageRowTemp = (Byte *)imPicture7->Picture->Bitmap->ScanLine[j];
+		for (i = 0; i < iWidth; i++)
+			{
+			iY = ((bPtrImageRowTemp[3*i +2]*66 +
+					bPtrImageRowTemp[3*i +1]*129 +
+					bPtrImageRowTemp[3*i]*25 +128)>>8)+16;
+
+			iC = iY -16;
+			iD = iU -128;
+			iE = iV -128;
+
+			iR = (298*iC + 409*iE +128)>>8;
+			iG = (298*iC - 100*iD - 208*iE +128)>>8;
+			iB = (298*iC + 516*iD +128)>>8;
+
+			if (iR > 255)
+				iR = 255;
+			if (iR < 0)
+				iR = 0;
+
+			if (iG > 255)
+				iG = 255;
+			if (iG < 0)
+				iG = 0;
+
+			if (iB > 255)
+				iB = 255;
+			if (iB < 0)
+				iB = 0;
+
+			bPtrImageRow[3*i] = iB;
+			bPtrImageRow[3*i +1] = iG;
+			bPtrImageRow[3*i +2] = iR;
+			}
+		}
+
+	imPicture8->Refresh();
+}
+//---------------------------------------------------------------------------
+
+
